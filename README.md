@@ -2,7 +2,11 @@
 
 > [English](README.en.md) ｜ 中文
 
-一套**完全自包含**的学术写作技能(skill):把一个研究想法,一路带到投稿就绪的稿件——从**定方向**、到**核对过 DOI 的文献库**、到**起草+多轮审稿+去AI**、再到 **LaTeX / Word / PDF** 输出。**不依赖任何其它 skill**:装这一个插件,整条流水线就都有了。
+研究稿件的产出,横跨若干彼此独立、又各自容易出错的环节:确定切入角度、检索并核验文献的引用完整性、依证据强度恰当地起草、经独立审稿剔除过度声称、控制行文的可读性与可检测的 AI 痕迹,直至排版成投稿格式。这些环节通常由各自为政的零散工具或纯人工完成,而衔接之处最易出错——一个张冠李戴的 DOI、一句越过证据的断言、一段读来均匀机械的文字,任一处都可能在评审阶段折损整篇稿件的可信度。
+
+**research-to-paper 将这条链整合为一套完全自包含的技能(skill)**,以单一插件的形式,把一个研究想法系统地带过上述全部环节,且全程将用户置于决策回路之中。其设计遵循三条原则:**严谨**——每篇文献的 DOI 经 CrossRef 逐条核验,行文措辞与证据强度严格匹配(模型与基因层面只作 predict,整体实测方可 confirm),并由多个相互独立的审稿主体对抗式复核;**自包含**——检索、核验、审稿、写作、去 AI、排版均内置于本技能,不依赖任何外部 skill,装此一件即得全链;**可审计**——每一处写作判断与每一处去 AI 改动都留有可追溯的记录矩阵,而非黑箱产出。
+
+整条流水线为:**研究想法 → 确定方向(含目标期刊及其投稿要求)→ 建立经核验的文献库 → 起草 → 多轮对抗审稿 → 去 AI(含长短句调节)→ 输出 LaTeX / Word / PDF**;各环节亦可单独调用。
 
 适用于 **Claude Code** 与 **Codex**。
 
@@ -15,16 +19,16 @@
 **方式一 · 插件市场(推荐)**
 
 ```
-/plugin marketplace add Jason-0409-G/skill_writing
-/plugin install research-to-paper@skill-writing
+/plugin marketplace add Jason-0409-G/research-to-paper
+/plugin install research-to-paper@research-to-paper
 /reload-plugins
 ```
 
 **方式二 · 脚本(克隆后本地装)**
 
 ```bash
-git clone https://github.com/Jason-0409-G/skill_writing.git
-cd skill_writing
+git clone https://github.com/Jason-0409-G/research-to-paper.git
+cd research-to-paper
 bash install.sh claude          # macOS / Linux
 # Windows PowerShell:  .\install.ps1 -Target claude
 ```
@@ -33,8 +37,8 @@ bash install.sh claude          # macOS / Linux
 ### Codex
 
 ```bash
-git clone https://github.com/Jason-0409-G/skill_writing.git
-cd skill_writing
+git clone https://github.com/Jason-0409-G/research-to-paper.git
+cd research-to-paper
 bash install.sh codex           # macOS / Linux
 # Windows PowerShell:  .\install.ps1 -Target codex
 ```

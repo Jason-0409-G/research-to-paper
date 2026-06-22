@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "skill-writing",
+  "name": "research-to-paper",
   "description": "Personal research-and-writing skills.",
   "owner": {
     "name": "Jason-0409-G"
@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "research-to-paper",
-      "description": "Curate a DOI-verified literature library (Zotero/EndNote + by-category Excel) and orchestrate writing via PaperSpine. Adds CrossRef DOI verification, a multi-agent adversarial review gate, and RIS/BibTeX export.",
+      "description": "Self-contained research-writing pipeline: scope a direction (with target-journal requirements), build a DOI-verified literature library (Zotero/EndNote RIS + BibTeX + by-category Excel), draft with evidence-matched hedging, run a multi-agent adversarial review, de-AI the prose (long-short sentence variation), and render LaTeX/Word/PDF. Depends on no other skill.",
       "author": {
         "name": "Jason-0409-G"
       },

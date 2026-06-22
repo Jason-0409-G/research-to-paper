@@ -2,10 +2,26 @@
 
 > English ｜ [中文](README.md)
 
-A fully **self-contained** academic-writing skill that takes a research idea all the way to a submission-ready
-manuscript — from **deciding the direction**, to a **DOI-verified reference library**, to a **drafted, reviewed,
-de-AI'd** paper, to **LaTeX / Word / PDF** output. It depends on **no other skill**: install this one plugin and
-you have the whole pipeline.
+Producing a research manuscript spans a series of loosely coupled, individually error-prone stages: fixing the
+angle of attack, retrieving the literature and verifying that every citation is real and correctly attributed,
+drafting in proportion to the strength of the evidence, pruning over-claims through independent review, governing
+readability and the detectable traces of machine authorship, and finally typesetting to a submission format. These
+stages are usually handled by a scatter of single-purpose tools or by hand, and the seams between them are where
+things break — a mis-attributed DOI, a sentence that runs ahead of its evidence, a paragraph whose uniform cadence
+reads as machine-written — any one of which can cost a manuscript its credibility at review.
+
+**research-to-paper consolidates this chain into a single, fully self-contained skill.** As one plugin, it carries
+a research idea systematically through all of the stages above while keeping the author in the decision loop
+throughout. Its design rests on three principles. **Rigor** — every reference's DOI is checked one by one against
+CrossRef, wording is matched to the strength of the evidence (a model or single gene may only *predict*; a measured
+whole-system result may *confirm*), and the draft is cross-examined by several mutually independent reviewer agents.
+**Self-containment** — search, verification, review, drafting, de-AI, and typesetting are all built in; it depends
+on no external skill, so installing this one plugin gives you the whole pipeline. **Auditability** — every writing
+judgment and every de-AI edit leaves a traceable record matrix rather than a black-box output.
+
+The full pipeline runs: **research idea → fix the direction (including the target journal and its author
+requirements) → build a verified reference library → draft → multi-round adversarial review → de-AI (with long-short
+sentence variation) → render LaTeX / Word / PDF**; each stage can also be invoked on its own.
 
 Works in **Claude Code** and **Codex**.
 
@@ -18,16 +34,16 @@ Works in **Claude Code** and **Codex**.
 **Option 1 · Plugin marketplace (recommended)**
 
 ```
-/plugin marketplace add Jason-0409-G/skill_writing
-/plugin install research-to-paper@skill-writing
+/plugin marketplace add Jason-0409-G/research-to-paper
+/plugin install research-to-paper@research-to-paper
 /reload-plugins
 ```
 
 **Option 2 · Script (clone, then install locally)**
 
 ```bash
-git clone https://github.com/Jason-0409-G/skill_writing.git
-cd skill_writing
+git clone https://github.com/Jason-0409-G/research-to-paper.git
+cd research-to-paper
 bash install.sh claude          # macOS / Linux
 # Windows PowerShell:  .\install.ps1 -Target claude
 ```
@@ -36,8 +52,8 @@ Restart Claude Code, then just ask it to "follow the research-to-paper workflow"
 ### Codex
 
 ```bash
-git clone https://github.com/Jason-0409-G/skill_writing.git
-cd skill_writing
+git clone https://github.com/Jason-0409-G/research-to-paper.git
+cd research-to-paper
 bash install.sh codex           # macOS / Linux
 # Windows PowerShell:  .\install.ps1 -Target codex
 ```
