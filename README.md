@@ -62,6 +62,24 @@ bash install.sh codex           # macOS / Linux
 
 ---
 
+## 文档
+
+GitHub 顶部标签栏(README / MIT license)只认一组**固定的标准文件**,无法挂任意说明文档。这里给出全部说明的一键入口:
+
+**参考文档**
+- [生物公共接口 + API 凭据](skills/research-to-paper-curate/references/bio-sources.md)
+- [工作区与产物规范](skills/research-to-paper/references/artifacts.md)
+- [写作技艺:对冲阶梯 + 各场景结构](skills/research-to-paper-write/references/writing-craft.md)
+- [三审 prompt + 主编综合](skills/research-to-paper-audit/references/audit-prompts.md)
+- [五维去 AI 规则](skills/research-to-paper-humanize/references/humanize-rules.md)
+- [文献对抗审查门](skills/research-to-paper-curate/references/adversarial-review.md)
+- [API 凭据模板 `.env.example`](.env.example)
+
+**各子 skill 说明**
+- [research-to-paper(主编排)](skills/research-to-paper/SKILL.md) · [scope 定方向](skills/research-to-paper-scope/SKILL.md) · [curate 建库 / 检索](skills/research-to-paper-curate/SKILL.md) · [write 写作](skills/research-to-paper-write/SKILL.md) · [audit 对抗审稿](skills/research-to-paper-audit/SKILL.md) · [humanize 去 AI](skills/research-to-paper-humanize/SKILL.md) · [build 排版](skills/research-to-paper-build/SKILL.md)
+
+---
+
 ## 工作模式、场景与深度
 
 - **两种入口**:**改写已有稿**(Rewrite Existing —— 在你的草稿上提升论证 / 结构 / 对冲,不降级为表面润色)或**从素材构建**(Build From Materials —— 用笔记、数据、图、PDF、部分初稿从零起草)。

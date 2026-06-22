@@ -79,6 +79,25 @@ all hit the right sub-skill directly.
 
 ---
 
+## Documentation
+
+GitHub's top tab bar (README / MIT license) only recognises a **fixed set of standard files**, so arbitrary docs
+can't be pinned there. Here is one-click access to all of them instead:
+
+**Reference docs**
+- [Biology public interfaces + API credentials](skills/research-to-paper-curate/references/bio-sources.md)
+- [Workspace & artifacts spec](skills/research-to-paper/references/artifacts.md)
+- [Writing craft: hedging ladder + per-scene structures](skills/research-to-paper-write/references/writing-craft.md)
+- [Three-reviewer prompts + Editor Synthesis](skills/research-to-paper-audit/references/audit-prompts.md)
+- [Five-dimension de-AI rules](skills/research-to-paper-humanize/references/humanize-rules.md)
+- [Adversarial reference-review gate](skills/research-to-paper-curate/references/adversarial-review.md)
+- [Credentials template `.env.example`](.env.example)
+
+**Per sub-skill**
+- [research-to-paper (orchestrator)](skills/research-to-paper/SKILL.md) · [scope](skills/research-to-paper-scope/SKILL.md) · [curate](skills/research-to-paper-curate/SKILL.md) · [write](skills/research-to-paper-write/SKILL.md) · [audit](skills/research-to-paper-audit/SKILL.md) · [humanize](skills/research-to-paper-humanize/SKILL.md) · [build](skills/research-to-paper-build/SKILL.md)
+
+---
+
 ## Modes, scenes & depth
 
 - **Two entry modes**: **Rewrite Existing** (strengthen your draft's argument / structure / hedging — not surface polish) or **Build From Materials** (draft from notes, data, figures, PDFs, partial drafts).
