@@ -29,6 +29,8 @@ Works in **Claude Code** and **Codex**.
 
 ## Install
 
+> Don't have Claude Code yet? **Windows users (especially on slow networks in mainland China)** see [Installing Claude Code on Windows (with China mirrors)](docs/install-claude-code-windows.md) — a China-focused, Chinese-language guide.
+
 ### Claude Code
 
 **Option 1 · Plugin marketplace (recommended)**

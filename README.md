@@ -14,6 +14,8 @@
 
 ## 安装
 
+> 还没装 Claude Code?**Windows 用户(尤其国内网络慢)**先看 [在 Windows 上安装 Claude Code(含国内镜像)](docs/install-claude-code-windows.md)。
+
 ### Claude Code
 
 **方式一 · 插件市场(推荐)**
