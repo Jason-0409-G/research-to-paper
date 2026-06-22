@@ -1,7 +1,6 @@
 {
   "name": "research-to-paper",
   "description": "Self-contained research-writing pipeline: scope a direction (with target-journal requirements), build a DOI-verified literature library (Zotero/EndNote RIS + BibTeX + by-category Excel) with CrossRef cross-verification, draft with evidence-matched hedging, run a multi-agent adversarial review, de-AI the prose (long-short sentence variation), and render LaTeX/Word/PDF. Depends on no other skill.",
-  "version": "0.1.0",
   "author": {
     "name": "Jason-0409-G"
   }

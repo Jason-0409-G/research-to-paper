@@ -62,6 +62,29 @@ use them. `bash install.sh all` installs to both at once.
 
 ---
 
+## Update
+
+Every push to this repo is automatically a new version (`plugin.json` pins no version number, so Claude Code uses
+the git commit SHA). To update an installed copy to the latest:
+
+**If installed from the marketplace**
+```
+/plugin marketplace update research-to-paper
+/reload-plugins
+```
+`marketplace update` fetches the latest and updates installed plugins; `/reload-plugins` applies it in the current
+session, or just restart Claude Code.
+
+**If installed via the script**
+```bash
+cd research-to-paper   # the folder you cloned
+git pull
+bash install.sh all    # claude / codex / all
+```
+Then **restart Claude Code / Codex**.
+
+---
+
 ## What each sub-skill does
 
 | Sub-skill | Purpose |

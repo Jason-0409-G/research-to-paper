@@ -46,6 +46,27 @@ bash install.sh codex           # macOS / Linux
 
 ---
 
+## 更新
+
+本仓库每次推送都自动算一个新版本(`plugin.json` 不固定版本号,改用 git commit SHA),已安装的版本这样更新到最新:
+
+**插件市场装的**
+```
+/plugin marketplace update research-to-paper
+/reload-plugins
+```
+`marketplace update` 拉取最新并更新已装插件;`/reload-plugins` 让本会话立即生效,或重启 Claude Code 亦可。
+
+**脚本装的**
+```bash
+cd research-to-paper   # 之前 clone 的目录
+git pull
+bash install.sh all    # claude / codex / all
+```
+然后**重启 Claude Code / Codex**。
+
+---
+
 ## 七个子 skill 的职能
 
 | 子 skill | 职能 |
