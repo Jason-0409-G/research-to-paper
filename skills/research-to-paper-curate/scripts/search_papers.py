@@ -33,6 +33,17 @@ def _get(url, tries=3, raw=False, headers=None):
             with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=TIMEOUT) as r:
                 data = r.read().decode("utf-8", "replace")
             return data if raw else json.loads(data)
+        except urllib.error.HTTPError as e:
+            if e.code in (400, 401, 403, 404):        # permanent — don't waste retries
+                return None
+            wait = 2 ** i                             # 429 (rate limit) / 5xx → back off, honor Retry-After
+            ra = e.headers.get("Retry-After") if e.headers else None
+            if ra:
+                try:
+                    wait = max(wait, min(int(ra), 10))
+                except (TypeError, ValueError):
+                    pass
+            time.sleep(wait)
         except Exception:
             time.sleep(2 ** i)
     return None
@@ -128,7 +139,8 @@ def semantic_scholar(q, n):
     key = os.environ.get("S2_API_KEY", "")
     d = _get(f"https://api.semanticscholar.org/graph/v1/paper/search?limit={n}"
              f"&fields=title,authors,year,venue,abstract,externalIds&query={urllib.parse.quote(q)}",
-             headers={"x-api-key": key} if key else None)
+             headers={"x-api-key": key} if key else None,
+             tries=5 if key else 4)                   # S2's shared pool throttles hardest; give it more tries
     out = []
     for p in ((d or {}).get("data") or []):
         out.append(dict(title=p.get("title", ""),
@@ -201,6 +213,9 @@ def main():
             r = []; print(f"  {name} 出错: {e}")
         print(f"  {name} {len(r)}")
         results.append(r); time.sleep(0.4)
+    s2n = next((len(r) for (nm, _), r in zip(SOURCES, results) if nm == "SemanticScholar"), 0)
+    if s2n == 0 and not os.environ.get("S2_API_KEY"):
+        print("[search] 提示: Semantic Scholar 返回 0,多半是免 key 共享池被限速;设 S2_API_KEY(免费)可拿专属限额,其余四源已兜底")
     merged = merge(results)
     json.dump(merged, open(a.outfile, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     print(f"[search] 合并去重 → {len(merged)} 篇 → {a.outfile}")
