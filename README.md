@@ -52,14 +52,14 @@ bash install.sh codex           # macOS / Linux
 
 本仓库每次推送都自动算一个新版本(`plugin.json` 不固定版本号,改用 git commit SHA),已安装的版本这样更新到最新:
 
-**插件市场装的**
+**插件市场安装**
 ```
 /plugin marketplace update scriptorium
 /reload-plugins
 ```
 `marketplace update` 拉取最新并更新已装插件;`/reload-plugins` 让本会话立即生效,或重启 Claude Code 亦可。
 
-**脚本装的**
+**脚本安装**
 ```bash
 cd scriptorium   # 之前 clone 的目录
 git pull
