@@ -96,6 +96,8 @@ claude
 
 Claude Code 支持把后端指向**任意 Anthropic-API 兼容端点**;**设了端点和 token 就不走 Claude 登录、也不需要 Claude 会员**(官方鉴权优先级里 token 排在浏览器登录之前)。最稳的做法是写进 `~/.claude/settings.json`,并顺手关掉首次运行的引导。
 
+**最省事 · 下载现成模板**:打开 [`templates/settings.json`](../templates/settings.json) → 点「Download raw file」→ 用记事本把 `ANTHROPIC_AUTH_TOKEN` 换成你的 key → 放进 `~/.claude/`。下面是手动写法与字段说明:
+
 用记事本新建 / 编辑 `C:\Users\你的用户名\.claude\settings.json`,填入:
 ```json
 {
