@@ -263,6 +263,72 @@ def cached_classify(row, mailto, cache, lock, no_api):
     return res
 
 
+def crossref_batch(dois, mailto):
+    """One CrossRef request for many DOIs (filter=doi:A,doi:B,...). Returns {doi_lower: cr_title},
+    or None if the request itself failed (so a transient failure isn't mislabeled as 'dead').
+    Collapses per-call latency — the big win on a high-latency link (e.g. from China)."""
+    flt = ",".join("doi:" + d.strip() for d in dois if d.strip())
+    if not flt:
+        return {}
+    url = f"{CR_QUERY}?filter={urllib.parse.quote(flt, safe=':,/()')}&rows={len(dois)}&select=DOI,title"
+    data = _get(url, mailto)
+    if data is UNREACHABLE or not data or "message" not in data:
+        return None
+    out = {}
+    for it in (data["message"].get("items") or []):
+        d = (it.get("DOI") or "").strip().lower()
+        if d:
+            out[d] = cr_title_of(it)
+    return out
+
+
+def run_batch(rows, mailto, batch_size, workers):
+    """Batch-verify supplied DOIs (one request per chunk), then resolve the non-verified minority
+    (mismatch / dead / no-DOI) with parallel title searches. Same verdict semantics + output schema
+    as the per-DOI path, but the supplied-DOI latency is paid once per chunk instead of per paper."""
+    results = [None] * len(rows)
+    have = [(i, d) for i, r in enumerate(rows) for d in [(r.get("doi", "") or "").strip()] if d]
+    need = []                                          # rows still needing a title-search proposal
+
+    for k in range(0, len(have), batch_size):          # Pass 1 — batched DOI lookups
+        chunk = have[k:k + batch_size]
+        meta = crossref_batch([d for _, d in chunk], mailto)
+        time.sleep(THROTTLE)
+        for i, d in chunk:
+            title = rows[i].get("title", "")
+            if meta is None:                           # batch request failed → not 'dead', just unverified
+                results[i] = dict(doi_status="unverified", verified_doi=d, cr_title="", title_sim=0.0)
+                continue
+            cr = meta.get(d.lower())
+            if cr is None:                             # DOI absent from CrossRef → dead
+                results[i] = dict(doi_status="dead", verified_doi="", cr_title="", title_sim=0.0)
+                need.append(i)
+            else:
+                s = sim(title, cr)
+                if s >= SIM_VERIFIED and _specific_enough(title, cr) and _discriminators_ok(title, cr):
+                    results[i] = dict(doi_status="verified", verified_doi=d, cr_title=cr, title_sim=s)
+                else:
+                    results[i] = dict(doi_status="mismatch", verified_doi="", cr_title="", title_sim=0.0)
+                    need.append(i)
+
+    nodoi = [i for i, r in enumerate(rows) if not (r.get("doi", "") or "").strip()]
+
+    def propose_row(i, base):                          # Pass 2 — parallel proposals for the minority
+        title = rows[i].get("title", "")
+        bdoi, bct, bs = search_title(title, mailto); time.sleep(THROTTLE)
+        ok = bool(bdoi) and bs >= SIM_PROPOSE and _specific_enough(title, bct) and _discriminators_ok(title, bct)
+        st = "candidate" if (base == "no_doi" and ok) else base
+        return dict(doi_status=st, verified_doi=(bdoi if ok else ""), cr_title=bct, title_sim=bs)
+
+    jobs = [(i, results[i]["doi_status"]) for i in need] + [(i, "no_doi") for i in nodoi]
+    if jobs:
+        with cf.ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+            futs = {ex.submit(propose_row, i, base): i for i, base in jobs}
+            for fut in cf.as_completed(futs):
+                results[futs[fut]] = fut.result()
+    return results
+
+
 # ---- IO: support .json array or .tsv/.csv with header ----
 def loads_lenient(text):
     """Parse JSON tolerantly — a weak model (e.g. a DeepSeek-flash subagent) often wraps its
@@ -313,6 +379,9 @@ def main():
                     help="optional JSON cache path; skips re-querying DOIs/titles seen in a prior run")
     ap.add_argument("--no-api", action="store_true",
                     help="offline: skip CrossRef, only mark has-DOI vs no-DOI (CI / no network)")
+    ap.add_argument("--batch", action="store_true",
+                    help="batch-verify supplied DOIs (one CrossRef request per chunk) — much faster on a high-latency link (e.g. from China)")
+    ap.add_argument("--batch-size", type=int, default=25, help="DOIs per batched request (default 25)")
     a = ap.parse_args()
 
     rows = read_rows(a.infile)
@@ -326,26 +395,35 @@ def main():
         except Exception:
             cache = {}
 
-    mode = "offline (--no-api)" if a.no_api else f"CrossRef polite pool mailto={a.mailto} · {a.workers} workers"
+    mode = ("offline (--no-api)" if a.no_api else
+            f"CrossRef batch (size {a.batch_size}) + {a.workers} workers for proposals" if a.batch else
+            f"CrossRef polite pool mailto={a.mailto} · {a.workers} workers")
     print(f"[verify_doi] {len(rows)} 篇 · {mode}")
 
     # Verify concurrently — each paper makes 1-3 CrossRef calls, so this is I/O bound;
     # a bounded thread pool turns minutes of sequential throttling into seconds while
     # staying inside CrossRef's polite-pool rate. Results re-aligned to input order.
-    counts, results, done = {}, [None] * len(rows), 0
+    counts, results = {}, [None] * len(rows)
     workers = 1 if a.no_api else max(1, a.workers)
-    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(cached_classify, r, a.mailto, cache, lock, a.no_api): i
-                for i, r in enumerate(rows)}
-        for fut in cf.as_completed(futs):
-            i = futs[fut]
-            res = fut.result()
-            results[i] = res
-            done += 1
+    if a.batch and not a.no_api:
+        results = run_batch(rows, a.mailto, max(1, a.batch_size), workers)
+        for res in results:
             counts[res["doi_status"]] = counts.get(res["doi_status"], 0) + 1
-            flag = "" if res["doi_status"] == "verified" else "  <-- 需人工确认 review"
-            print(f"  [{done}/{len(rows)}] {res['doi_status']:9} sim={res['title_sim']}  "
-                  f"{(rows[i].get('title', '') or '')[:60]}{flag}")
+        print(f"  批量核完 {len(rows)} 篇 · 统计 {counts}")
+    else:
+        done = 0
+        with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {ex.submit(cached_classify, r, a.mailto, cache, lock, a.no_api): i
+                    for i, r in enumerate(rows)}
+            for fut in cf.as_completed(futs):
+                i = futs[fut]
+                res = fut.result()
+                results[i] = res
+                done += 1
+                counts[res["doi_status"]] = counts.get(res["doi_status"], 0) + 1
+                flag = "" if res["doi_status"] == "verified" else "  <-- 需人工确认 review"
+                print(f"  [{done}/{len(rows)}] {res['doi_status']:9} sim={res['title_sim']}  "
+                      f"{(rows[i].get('title', '') or '')[:60]}{flag}")
 
     for r, res in zip(rows, results):
         r.update(res)
