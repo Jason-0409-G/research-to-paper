@@ -75,7 +75,7 @@ bash install.sh all    # claude / codex / all
 |---|---|
 | **research-to-paper** | 主编排。识别当前所处环节,按需将请求导入 **确定方向 → 建库 → 写作 → 排版**,各环节均可独立调用。 |
 | **research-to-paper-scope** | **确定方向**。先检索权威文献以厘清领域脉络,再以逐项确认的方式依次定下:切入角度 / 研究问题 → 范围 → **目标期刊** → **篇幅字数** → 核心子主题;目标期刊一经确定,即**联网查询该刊投稿要求**(收录范围、文章类型、篇幅、结构、引用格式)。产出 `scope_brief.md`。 |
-| **research-to-paper-curate** | **建立文献库 + 资源检索**。五源文献检索(OpenAlex / Europe PMC / PubMed / Semantic Scholar / Crossref)→ 逐篇经 **CrossRef 核验 DOI**(可识别"能够解析但指向错误文献"的情形并找回正确 DOI)→ **多 agent 对抗审查**,剔除伪造与错误归属的条目 → **配置了 Zotero API 即按分类直接导入**,否则导出 **RIS(Zotero/EndNote 通用)+ BibTeX + 按主题着色的 Excel**。另可检索生物**资源**库:任意 NCBI Entrez 库(蛋白 / 核酸 / 基因 / 物种 / 组装 / 结构 / SRA …)+ UniProt / RCSB PDB / AlphaFold / Europe PMC。 |
+| **research-to-paper-curate** | **建立文献库 + 资源检索**。五源文献检索(OpenAlex / Europe PMC / PubMed / Semantic Scholar / Crossref)→ 逐篇经 **CrossRef 核验 DOI**(可识别"能够解析但指向错误文献"的情形并找回正确 DOI)→ **多 agent 对抗审查**,剔除伪造与错误归属的条目 → **配置了 Zotero API 即按分类直接导入**,否则导出 **RIS(Zotero/EndNote 通用)+ BibTeX + 一张「每篇配中文重点」的着色 Excel**(分类 / DOI 核验状态 / **中文重点** / 创新评分 / 影响因子 / 引用数;跨搜索**累积去重**,只有 `verified` 的 DOI 才作可信 DOI 导出)。DOI 核验**并行**跑 CrossRef(8 线程,可缓存/离线)。另可检索生物**资源**库:任意 NCBI Entrez 库(蛋白 / 核酸 / 基因 / 物种 / 组装 / 结构 / SRA …)+ UniProt / RCSB PDB / AlphaFold / Europe PMC。 |
 | **research-to-paper-write** | **写作**。先理解内容、复述核心论点并与用户确认 → 列**逐单元 rationale 矩阵**(不套用固定 IMRaD 模板)→ 按**证据对冲**原则起草(模型 / 基因层面仅作 predict、整体实测方可 confirm);并编排后续审稿与去 AI 环节。覆盖五种场景:期刊论文 / 会议论文 / 报告 / 综述 / 竞赛。 |
 | **research-to-paper-audit** | **多轮对抗审稿**。调度 **3 个相互独立的审稿 agent**(claim 支撑 / 逻辑结构 / 引用证据)与主编综合,**循环审至一轮无新问题为止**;重点检出过度声称、缺乏依据的 claim、结果区混入解读、改动流于表面、引用无法支撑其所在句等问题。可单独调用("审阅这篇草稿")。 |
 | **research-to-paper-humanize** | **降低 AI 痕迹**。沿**五个维度**改写:**D1 句长(长短句结合)**、D2 段落结构变化、D3 信息密度起伏、D4 连接词控制(删除"首先 / 其次 / 此外 / 值得注意的是"等)、D5 术语表述变体;分 light / medium / heavy 三档,每处改动登记入 `humanize_matrix.md`,再以 `humanize_check.py` 作**量化校验**。可单独调用("降低这段文字的 AI 痕迹")。 |
@@ -150,7 +150,7 @@ manuscript_workspace/
 ├── library/
 │   ├── library.ris             # curate:Zotero / EndNote 通用
 │   ├── library.bib             # curate:pandoc / LaTeX
-│   └── library.xlsx            # curate:按主题着色(缺 openpyxl 退 .csv)
+│   └── library.xlsx            # curate:每篇配中文重点 + 核验状态着色 + 跨搜索累积去重(缺 openpyxl 退 .csv)
 ├── writing_rationale_matrix.md # write:逐单元写作理据(claim / 证据 / 对冲档 / 来源)
 ├── draft.md                    # write:工作草稿(含 [@key] 引用)
 ├── audit_report.md             # audit:三审 + 主编综合,逐轮直至无新问题
@@ -168,7 +168,7 @@ manuscript_workspace/
 每个检查都是纯标准库脚本(下方为仓库内路径;安装后脚本位于 `~/.claude/skills/` 或 `~/.codex/skills/` 下):
 
 ```bash
-# 文献 DOI 真实且匹配(curate)
+# 文献 DOI 真实且匹配(curate;并行 8 线程,--cache 复用 / --no-api 离线;有 mismatch/dead 时退出码非 0)
 python skills/research-to-paper-curate/scripts/verify_doi.py <papers.json> <verified.json>
 
 # 正文 [@key] / \cite 能在 library.bib 解析(write → build)
@@ -194,6 +194,33 @@ python -m unittest discover -s tests
 - **`pandoc`** — `research-to-paper-build` 输出 LaTeX / Word 所必需(`brew install pandoc` / `apt install pandoc` / Windows 用 winget 或 choco)。
 - **TeX 引擎**(xelatex / pdflatex)— 仅 PDF 需要;缺失时仍会输出 `.tex`,可另行编译。
 - **API 凭据(全部可选)** — 复制 `.env.example` 为 `.env`(或 `~/.config/research-to-paper/keys.env`)填入:`CROSSREF_MAILTO` / `NCBI_EMAIL` 进更快的 polite 池;`NCBI_API_KEY` / `S2_API_KEY` 提升限速;`ZOTERO_API_KEY` + `ZOTERO_USER_ID` 则把文献**直接按分类导入 Zotero**(EndNote 无公开写入 API,仍走 `.ris` 文件导入)。`.env` 已被 gitignore,不入仓库;无任何 key 也能用。
+
+---
+
+## 在 DeepSeek 后端运行
+
+本技能可经 Anthropic 兼容代理由 **DeepSeek** 驱动(把 Claude Code 的 `ANTHROPIC_BASE_URL` 指向
+`https://api.deepseek.com/anthropic`,模型用 `deepseek-v4-pro[1m]`(含 `[1m]` 后缀,即 100 万上下文版本,以 DeepSeek
+官方文档为准;配置模板见 `templates/settings.json`)。设计上对弱模型友好:**一切事实核查由确定性脚本完成,模型不做
+DOI 解析**——`verify_doi.py` 在脚本里并行核验 + 标题比对,弱模型无法「假装」某个 DOI 已核实;需要模型填的只剩很
+轻的活(分类、一句中文重点),且脚本容忍代码围栏 / 字段别名 / 缺字段而优雅降级。注意 DeepSeek 下**子代理跑在更弱的
+`deepseek-v4-flash`**——curate 的对抗审查门与 audit 的多审,弱后端下应以 `verify_doi.py` 的确定性闸门
+(mismatch / dead 即阻断)为主防线。完整清单见 **[DeepSeek 兼容说明](docs/deepseek-compatibility.md)**。
+
+---
+
+## DOI 核验性能(并行)
+
+逐条核 CrossRef 原本串行,是 curate 的耗时瓶颈;改并行后(实测 12 个 DOI,本机):
+
+| 模式 | 12 个 DOI 耗时 |
+|---|---|
+| 串行(`--workers 1`) | 45.1 s |
+| **并行(`--workers 8`,默认)** | **7.0 s(约 6.4× 快)** |
+| 并行 + 缓存复用(`--cache`) | 0.9 s(约 50×) |
+
+一个 50–100 篇的文献库,核验从「几分钟」降到「几秒」。核验逻辑全在脚本里(并行 + 标题比对 + 判别词闸,确认 supplied
+DOI 严格 0.85),模型不参与 DOI 解析——换 DeepSeek 等弱后端,速度与正确性都不受影响。
 
 ---
 

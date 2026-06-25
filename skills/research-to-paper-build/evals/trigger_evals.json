@@ -1,0 +1,34 @@
+[
+  {
+    "query": "把这个稿子导出成LaTeX和Word",
+    "should_trigger": true
+  },
+  {
+    "query": "生成Word文档 / 转成docx",
+    "should_trigger": true
+  },
+  {
+    "query": "排版成论文PDF，把[@key]引用解析成参考文献列表",
+    "should_trigger": true
+  },
+  {
+    "query": "export to LaTeX / render to PDF / build the .tex",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我写这篇论文",
+    "should_trigger": false
+  },
+  {
+    "query": "降一下AI率",
+    "should_trigger": false
+  },
+  {
+    "query": "核对参考文献",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我定方向",
+    "should_trigger": false
+  }
+]

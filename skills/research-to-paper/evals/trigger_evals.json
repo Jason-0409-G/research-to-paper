@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Take this research idea all the way to a submission-ready manuscript.",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我从定方向到写出来，再排版成投稿稿",
+    "should_trigger": true
+  },
+  {
+    "query": "整理文献库并核对DOI，然后据此写论文",
+    "should_trigger": true
+  },
+  {
+    "query": "从一个想法做到初稿，全流程走一遍",
+    "should_trigger": true
+  },
+  {
+    "query": "我想投某期刊，先定方向，再建库，再写",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我写这篇论文的引言",
+    "should_trigger": false
+  },
+  {
+    "query": "把这批参考文献核对一下DOI",
+    "should_trigger": false
+  },
+  {
+    "query": "审一下我这篇草稿",
+    "should_trigger": false
+  },
+  {
+    "query": "把这个稿子导出成Word",
+    "should_trigger": false
+  },
+  {
+    "query": "这个基因组跟那个比一下ANI",
+    "should_trigger": false
+  }
+]

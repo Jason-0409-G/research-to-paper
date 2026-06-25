@@ -1,0 +1,46 @@
+[
+  {
+    "query": "整理文献库，把这批参考文献的DOI核对一下",
+    "should_trigger": true
+  },
+  {
+    "query": "核对这些引用是不是真实存在、有没有张冠李戴",
+    "should_trigger": true
+  },
+  {
+    "query": "把搜到的文献做成带中文重点的Excel",
+    "should_trigger": true
+  },
+  {
+    "query": "把每篇文章的重点用中文说明，整理成一个表",
+    "should_trigger": true
+  },
+  {
+    "query": "导成能进 EndNote 或 Zotero 的参考文献库",
+    "should_trigger": true
+  },
+  {
+    "query": "build me a DOI-verified reference library and export it",
+    "should_trigger": true
+  },
+  {
+    "query": "search PubMed/UniProt/NCBI for this and collect the records",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我定这篇论文的方向",
+    "should_trigger": false
+  },
+  {
+    "query": "把这些内容写成论文初稿",
+    "should_trigger": false
+  },
+  {
+    "query": "审一下这篇草稿有没有过度声称",
+    "should_trigger": false
+  },
+  {
+    "query": "生成Word文档",
+    "should_trigger": false
+  }
+]

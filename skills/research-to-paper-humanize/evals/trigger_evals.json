@@ -1,0 +1,38 @@
+[
+  {
+    "query": "把这段降AI率，去掉AI腔",
+    "should_trigger": true
+  },
+  {
+    "query": "长短句结合，去除AI痕迹",
+    "should_trigger": true
+  },
+  {
+    "query": "这段太像ChatGPT写的，改得像人写的",
+    "should_trigger": true
+  },
+  {
+    "query": "reduce the AI-detection rate of this draft",
+    "should_trigger": true
+  },
+  {
+    "query": "学术润色降AI",
+    "should_trigger": true
+  },
+  {
+    "query": "审一下这篇有没有逻辑问题",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我写这一节",
+    "should_trigger": false
+  },
+  {
+    "query": "核对DOI",
+    "should_trigger": false
+  },
+  {
+    "query": "转成Word",
+    "should_trigger": false
+  }
+]

@@ -71,7 +71,7 @@ claude --version
 
 - 访问令牌应使用 `ANTHROPIC_AUTH_TOKEN`,而非 `ANTHROPIC_API_KEY`。
 - 字段 `hasCompletedOnboarding: true` 不可省略,否则首次运行 `claude` 时仍将进入引导与登录流程。
-- `env` 中的各 `ANTHROPIC_*_MODEL` 与 `CLAUDE_CODE_*` 字段对应 DeepSeek 官方推荐的完整配置(主模型及 Opus / Sonnet / Haiku 映射、子代理模型、努力级别),照表填入即可;主模型名为 `deepseek-v4-pro[1m]`(含 `[1m]` 后缀)。
+- `env` 中的各 `ANTHROPIC_*_MODEL` 与 `CLAUDE_CODE_*` 字段对应 DeepSeek 官方推荐的完整配置(主模型及 Opus / Sonnet / Haiku 映射、子代理模型、努力级别),照表填入即可;主模型名为 `deepseek-v4-pro[1m]`(含 `[1m]` 后缀,即 100 万上下文版本,以 DeepSeek 官方文档为准)。
 - 上述取值以 DeepSeek 官方「Claude Code 接入」文档为准(<https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code>),其值可能随版本变更。
 
 # 五、安装 research-to-paper

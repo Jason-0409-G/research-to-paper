@@ -1,0 +1,38 @@
+[
+  {
+    "query": "审一下这篇草稿，多轮帮我挑毛病",
+    "should_trigger": true
+  },
+  {
+    "query": "查一下有没有无据的claim、有没有过度声称",
+    "should_trigger": true
+  },
+  {
+    "query": "逻辑审一遍，看证据撑不撑得起结论",
+    "should_trigger": true
+  },
+  {
+    "query": "review my draft / stress-test the argument",
+    "should_trigger": true
+  },
+  {
+    "query": "check that every citation actually supports its sentence",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我写一篇综述",
+    "should_trigger": false
+  },
+  {
+    "query": "把这篇降AI率",
+    "should_trigger": false
+  },
+  {
+    "query": "定个研究方向",
+    "should_trigger": false
+  },
+  {
+    "query": "导出PDF",
+    "should_trigger": false
+  }
+]

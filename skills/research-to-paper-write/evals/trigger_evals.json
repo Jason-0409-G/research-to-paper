@@ -1,0 +1,42 @@
+[
+  {
+    "query": "帮我把这些结果写成一篇论文",
+    "should_trigger": true
+  },
+  {
+    "query": "从这些素材构建一篇会议论文",
+    "should_trigger": true
+  },
+  {
+    "query": "改写这篇草稿，按我的写作纪律来",
+    "should_trigger": true
+  },
+  {
+    "query": "draft this into a paper / write up these results",
+    "should_trigger": true
+  },
+  {
+    "query": "写一篇综述（review article）",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我先定方向和切入点",
+    "should_trigger": false
+  },
+  {
+    "query": "只审一遍这篇草稿，别改",
+    "should_trigger": false
+  },
+  {
+    "query": "只把这段降AI率",
+    "should_trigger": false
+  },
+  {
+    "query": "把成稿转成latex和word",
+    "should_trigger": false
+  },
+  {
+    "query": "核对参考文献DOI",
+    "should_trigger": false
+  }
+]

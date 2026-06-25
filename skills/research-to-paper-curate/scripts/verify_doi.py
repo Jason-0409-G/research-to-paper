@@ -21,7 +21,8 @@ Output : same rows + appended fields:
 Usage: python verify_doi.py <papers.json|tsv|csv> <out.json|tsv|csv> [--mailto you@uni.edu]
        (mailto also read from $CROSSREF_MAILTO; CrossRef's "polite pool" is faster/kinder.)
 """
-import sys, os, json, csv, time, argparse, urllib.request, urllib.parse, urllib.error
+import sys, os, re, json, csv, time, argparse, threading, urllib.request, urllib.parse, urllib.error
+import concurrent.futures as cf
 from difflib import SequenceMatcher
 
 try:                                    # optional: load API creds from a .env-style file
@@ -31,8 +32,14 @@ except Exception:
 
 CR_WORK = "https://api.crossref.org/works/"
 CR_QUERY = "https://api.crossref.org/works"
-SIM_OK = 0.85          # title similarity above this = same paper
-THROTTLE = 0.4         # seconds between requests (be polite)
+# Two bars, on purpose. CONFIRMING a user-supplied DOI is safety-critical (a wrong-but-resolving
+# DOI is the dangerous case), so it needs a STRICT bar — a single content-word swap ("marine" vs
+# "soil" bacteria) blends to ~0.78, which must NOT count as the same paper. Merely PROPOSING a DOI
+# from a title search is lower-stakes (it still goes to the review gate), so it uses a looser bar.
+SIM_VERIFIED = 0.85    # confirm a supplied DOI only when its title this-closely matches ours
+SIM_PROPOSE = 0.75     # accept a title-search-proposed DOI at this bar (still routed to review)
+MIN_TITLE_WORDS = 4    # a Latin title shorter than this is too generic to trust on similarity alone
+THROTTLE = 0.2         # seconds between a worker's requests (bounded concurrency keeps us in the polite pool)
 TIMEOUT = 25
 UNREACHABLE = object()  # sentinel: transient failure (429/5xx) — NOT a dead DOI
 
@@ -41,8 +48,85 @@ def norm(s):
     return " ".join((s or "").lower().split())
 
 
+def _words(s):
+    # Unicode-aware: keep CJK/Greek/Cyrillic word chars so a correct non-Latin title still
+    # scores a real similarity (a stripped-to-ASCII title would score 0.0 and falsely "mismatch").
+    return re.sub(r"[^\w]+", " ", norm(s), flags=re.UNICODE).split()
+
+
 def sim(a, b):
-    return round(SequenceMatcher(None, norm(a), norm(b)).ratio(), 3)
+    """Blended word-Jaccard (0.5) + char-sequence ratio (0.5).
+
+    Pure SequenceMatcher over-penalizes reordered/abbreviated titles and
+    under-penalizes shared boilerplate; the blend (paper-spine's gate) is the
+    more reliable "is this the same paper" signal. 0..1, higher = more similar.
+    """
+    aw, bw = _words(a), _words(b)
+    if not aw or not bw:
+        return 0.0
+    sa, sb = set(aw), set(bw)
+    jac = len(sa & sb) / len(sa | sb)
+    seq = SequenceMatcher(None, " ".join(aw), " ".join(bw)).ratio()
+    return round(jac * 0.5 + seq * 0.5, 3)
+
+
+def _specific_enough(a, b):
+    """True only if BOTH titles carry enough signal to trust a similarity match.
+
+    Generic one/two-word titles ('Krill', 'Editorial', 'Data') hit Jaccard 1.0 against any
+    same-word record, which would auto-verify a fabricated DOI. Latin titles need >= a few
+    content words; CJK titles (no spaces, so few 'words') are judged by character length.
+    """
+    def signal(s):
+        n = norm(s)
+        # no-space scripts (CJK ideographs, kana, Hangul) → judge by character length, not word count
+        if any(("一" <= ch <= "鿿") or ("぀" <= ch <= "ヿ") or ("가" <= ch <= "힣") for ch in n):
+            return len(n.replace(" ", "")) >= 8
+        return len(_words(s)) >= MIN_TITLE_WORDS
+    return signal(a) and signal(b)
+
+
+STOPWORDS = {"the", "a", "an", "of", "and", "or", "in", "on", "for", "to", "with",
+             "by", "from", "de", "la", "le", "des", "und", "von", "el", "und"}
+
+
+def _content(s):
+    return [t for t in _words(s) if t not in STOPWORDS]
+
+
+def _near(t, words):
+    """t has a near-match among words — tolerates morphological drift (acid≈acids,
+    transcription≈transcriptional) but NOT a swap (bgla↛bglb, transcriptome↛transcription)."""
+    for w in words:
+        if t == w:
+            return True
+        if len(t) >= 4 and len(w) >= 4 and (t.startswith(w) or w.startswith(t)):
+            return True
+    return False
+
+
+def _discriminators_ok(a, b):
+    """True only if neither title swaps a discriminating token the other can't account for.
+
+    Blended similarity rates a long title differing by ONE swapped strain / species / gene / number
+    ("...vesiculosa strain L5" vs "...M7", "bglA" vs "bglB") as the same paper (~0.87 > the verified
+    bar), which would CONFIRM a wrong-paper DOI — the exact prime-directive failure. This guard blocks
+    it: number tokens (strain ids, years) must match EXACTLY, and every >=3-char content word of the
+    shorter title must have a near-match in the longer one. Near-match tolerates a dropped subtitle
+    and morphological drift (acid≈acids); a swapped epithet/gene/strain (vesiculosa↛livingstonensis,
+    bglA↛bglB) has none, so it fails. The 3-char floor reaches short gene/locus codes; below it a few
+    1-2 char swaps (roman numerals) remain the review gate's job. Verify-confirm path only."""
+    ca, cb = _content(a), _content(b)
+    sca, scb = set(ca), set(cb)
+    diga = {t for t in sca if any(c.isdigit() for c in t)}
+    digb = {t for t in scb if any(c.isdigit() for c in t)}
+    if diga != digb:
+        return False
+    short, long_ = (sca, scb) if len(ca) <= len(cb) else (scb, sca)
+    for t in short:
+        if len(t) >= 3 and not any(c.isdigit() for c in t) and not _near(t, long_):
+            return False
+    return True
 
 
 def _get(url, mailto, tries=3):
@@ -63,9 +147,11 @@ def _get(url, mailto, tries=3):
                 wait = max(wait, min(int(ra), 60))
             except (TypeError, ValueError):
                 pass
-            time.sleep(wait)
+            if i < tries - 1:                       # don't sleep after the final, give-up attempt
+                time.sleep(wait)
         except Exception:
-            time.sleep(2 ** i)
+            if i < tries - 1:
+                time.sleep(2 ** i)
     return UNREACHABLE             # exhausted on transient errors — not dead
 
 
@@ -106,37 +192,93 @@ def search_title(title, mailto):
     return best
 
 
-def classify(row, mailto):
-    """Decide doi_status + verified_doi + cr_title + title_sim for one paper."""
+def _cached_lookup(doi, mailto, cache, lock):
+    """lookup_doi() with a {doi: [cr_title, ok, reachable]} cache. Caches only the RAW CrossRef
+    result for the DOI — never a per-row verdict — so two different papers that share one DOI (a
+    copy-paste error this tool exists to catch) are each scored against THEIR OWN title."""
+    key = (doi or "").strip().lower()
+    if cache is not None and lock is not None and key:
+        with lock:
+            ent = cache.get(key)
+        if isinstance(ent, list) and len(ent) == 3:
+            return ent[0], ent[1], ent[2]
+    res = lookup_doi(doi, mailto)
+    if cache is not None and lock is not None and key:
+        with lock:
+            cache[key] = list(res)
+    return res
+
+
+def classify(row, mailto, cache=None, lock=None):
+    """Decide doi_status + verified_doi + cr_title + title_sim for one paper.
+
+    cr_title/title_sim always describe the SAME record as verified_doi (the supplied DOI on
+    'verified', the proposal on 'mismatch'/'candidate', blank when nothing was accepted)."""
     title = row.get("title", "")
     doi = (row.get("doi", "") or "").strip()
+
+    def propose(t):
+        bdoi, bct, bs = search_title(t, mailto); time.sleep(THROTTLE)
+        # the same discriminating-token guard applies to a proposal, so a candidate DOI can't point
+        # at a near-title with a swapped strain/gene/number either
+        if bdoi and bs >= SIM_PROPOSE and _specific_enough(t, bct) and _discriminators_ok(t, bct):
+            return bdoi, bct, bs
+        return "", "", 0.0                       # reject cleanly — never surface a non-accepted title
+
     if doi:
-        ct, ok, reachable = lookup_doi(doi, mailto)
+        ct, ok, reachable = _cached_lookup(doi, mailto, cache, lock)
         time.sleep(THROTTLE)
         if ok:
             s = sim(title, ct)
-            if s >= SIM_OK:
+            # CONFIRM only at the strict bar, with a specificity floor AND a discriminating-token
+            # guard so a single swapped strain/species/number on a long title can't pass as verified.
+            if s >= SIM_VERIFIED and _specific_enough(title, ct) and _discriminators_ok(title, ct):
                 return dict(doi_status="verified", verified_doi=doi, cr_title=ct, title_sim=s)
-            # resolves but wrong paper → find the right one by title
-            bdoi, bct, bs = search_title(title, mailto); time.sleep(THROTTLE)
-            return dict(doi_status="mismatch", verified_doi=(bdoi if bs >= SIM_OK else ""),
-                        cr_title=ct, title_sim=s)
-        # not ok: dead only if CrossRef was actually reached; else merely throttled
+            pdoi, pct, ps = propose(title)       # wrong paper / swapped discriminator / too generic → propose
+            return dict(doi_status="mismatch", verified_doi=pdoi, cr_title=pct, title_sim=ps)
         status = "dead" if reachable else "unverified"
-        bdoi, bct, bs = search_title(title, mailto); time.sleep(THROTTLE)
-        return dict(doi_status=status, verified_doi=(bdoi if bs >= SIM_OK else ""),
-                    cr_title=bct, title_sim=bs)
-    # no DOI at all → propose one from title search
-    bdoi, bct, bs = search_title(title, mailto); time.sleep(THROTTLE)
-    if bdoi and bs >= SIM_OK:
-        return dict(doi_status="candidate", verified_doi=bdoi, cr_title=bct, title_sim=bs)
-    return dict(doi_status="no_doi", verified_doi="", cr_title=bct, title_sim=bs)
+        pdoi, pct, ps = propose(title)
+        return dict(doi_status=status, verified_doi=pdoi, cr_title=pct, title_sim=ps)
+    pdoi, pct, ps = propose(title)               # no DOI → propose one from a title search
+    if pdoi:
+        return dict(doi_status="candidate", verified_doi=pdoi, cr_title=pct, title_sim=ps)
+    return dict(doi_status="no_doi", verified_doi="", cr_title="", title_sim=0.0)
+
+
+def classify_noapi(row):
+    """Offline structural pass (no network): only distinguishes has-DOI from no-DOI.
+    Lets the whole curate step run in CI / offline without hitting CrossRef."""
+    doi = (row.get("doi", "") or "").strip()
+    return dict(doi_status=("unverified" if doi else "no_doi"),
+                verified_doi=doi, cr_title="", title_sim=0.0)
+
+
+def cached_classify(row, mailto, cache, lock, no_api):
+    """One paper's verdict. The DOI→CrossRef lookup is cached (see _cached_lookup) so duplicate
+    DOIs don't re-hit the network, while the title comparison is ALWAYS recomputed against THIS
+    row's title — a paper sharing another's DOI is never handed the other's verdict."""
+    if no_api:
+        return classify_noapi(row)
+    res = classify(row, mailto, cache, lock)
+    return res
 
 
 # ---- IO: support .json array or .tsv/.csv with header ----
+def loads_lenient(text):
+    """Parse JSON tolerantly — a weak model (e.g. a DeepSeek-flash subagent) often wraps its
+    JSON in ```json fences or leaves a trailing comma. Strip those rather than crash the run."""
+    t = text.strip()
+    t = re.sub(r"^```[A-Za-z0-9]*\s*", "", t)
+    t = re.sub(r"\s*```$", "", t).strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r",(\s*[}\]])", r"\1", t))   # drop trailing commas, retry once
+
+
 def read_rows(path):
     if path.lower().endswith(".json"):
-        data = json.load(open(path, encoding="utf-8"))
+        data = loads_lenient(open(path, encoding="utf-8").read())
         return data if isinstance(data, list) else data.get("papers", [])
     delim = "\t" if path.lower().endswith(".tsv") else ","
     with open(path, encoding="utf-8-sig", newline="") as f:
@@ -147,6 +289,8 @@ def write_rows(path, rows):
     if path.lower().endswith(".json"):
         json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
         return
+    if not path.lower().endswith((".tsv", ".csv")):    # don't write CSV bytes under a .xlsx/other name
+        sys.exit(f"[verify_doi] 输出扩展名须为 .json / .tsv / .csv（收到 {path}）")
     delim = "\t" if path.lower().endswith(".tsv") else ","
     cols = []
     for r in rows:
@@ -163,27 +307,67 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("infile"); ap.add_argument("outfile")
     ap.add_argument("--mailto", default=os.environ.get("CROSSREF_MAILTO", "research-to-paper@example.com"))
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrent CrossRef lookups (default 8; the polite pool tolerates this)")
+    ap.add_argument("--cache", default="",
+                    help="optional JSON cache path; skips re-querying DOIs/titles seen in a prior run")
+    ap.add_argument("--no-api", action="store_true",
+                    help="offline: skip CrossRef, only mark has-DOI vs no-DOI (CI / no network)")
     a = ap.parse_args()
 
     rows = read_rows(a.infile)
     if not rows:
         sys.exit("[verify_doi] 输入为空 / empty input")
-    print(f"[verify_doi] {len(rows)} 篇 · CrossRef polite pool mailto={a.mailto}")
-    counts = {}
-    for i, r in enumerate(rows, 1):
-        res = classify(r, a.mailto)
+
+    cache, lock = {}, threading.Lock()
+    if a.cache and os.path.isfile(a.cache):
+        try:
+            cache = json.load(open(a.cache, encoding="utf-8"))
+        except Exception:
+            cache = {}
+
+    mode = "offline (--no-api)" if a.no_api else f"CrossRef polite pool mailto={a.mailto} · {a.workers} workers"
+    print(f"[verify_doi] {len(rows)} 篇 · {mode}")
+
+    # Verify concurrently — each paper makes 1-3 CrossRef calls, so this is I/O bound;
+    # a bounded thread pool turns minutes of sequential throttling into seconds while
+    # staying inside CrossRef's polite-pool rate. Results re-aligned to input order.
+    counts, results, done = {}, [None] * len(rows), 0
+    workers = 1 if a.no_api else max(1, a.workers)
+    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(cached_classify, r, a.mailto, cache, lock, a.no_api): i
+                for i, r in enumerate(rows)}
+        for fut in cf.as_completed(futs):
+            i = futs[fut]
+            res = fut.result()
+            results[i] = res
+            done += 1
+            counts[res["doi_status"]] = counts.get(res["doi_status"], 0) + 1
+            flag = "" if res["doi_status"] == "verified" else "  <-- 需人工确认 review"
+            print(f"  [{done}/{len(rows)}] {res['doi_status']:9} sim={res['title_sim']}  "
+                  f"{(rows[i].get('title', '') or '')[:60]}{flag}")
+
+    for r, res in zip(rows, results):
         r.update(res)
-        counts[res["doi_status"]] = counts.get(res["doi_status"], 0) + 1
-        flag = "" if res["doi_status"] == "verified" else "  <-- 需人工确认 review"
-        print(f"  [{i}/{len(rows)}] {res['doi_status']:9} sim={res['title_sim']}  "
-              f"{(r.get('title','') or '')[:60]}{flag}")
     write_rows(a.outfile, rows)
+
+    if a.cache:
+        try:
+            json.dump(cache, open(a.cache, "w", encoding="utf-8"), ensure_ascii=False)
+        except Exception:
+            pass
+
     print(f"\n[verify_doi] 写出 → {a.outfile}")
     print(f"[verify_doi] 统计: {counts}")
     bad = sum(v for k, v in counts.items() if k != "verified")
     if bad:
-        print(f"[verify_doi] ⚠ {bad} 篇非 verified(mismatch/dead/candidate/no_doi)→ 进对抗审查门,勿直接导入")
+        print(f"[verify_doi] ⚠ {bad} 篇非 verified(mismatch/dead/candidate/no_doi/unverified)→ 进对抗审查门,勿直接导入")
+    # Exit code as a loop signal (paper-spine pattern): the *dangerous* states — a DOI that
+    # resolves to the wrong paper (mismatch) or a dead DOI — fail the run so an orchestrator
+    # can route back automatically. candidate/no_doi/unverified are "needs review", not failures.
+    dangerous = counts.get("mismatch", 0) + counts.get("dead", 0)
+    return 1 if dangerous else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

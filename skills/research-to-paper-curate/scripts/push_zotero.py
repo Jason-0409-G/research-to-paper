@@ -17,7 +17,7 @@ Usage:  python push_zotero.py <verified.json>            # creds from env/.env
         python push_zotero.py <verified.json> --dry-run  # build payloads, do not POST
 """
 from __future__ import annotations
-import sys, os, json, time, argparse, urllib.request, urllib.parse, urllib.error
+import sys, os, re, json, time, argparse, urllib.request, urllib.parse, urllib.error
 
 try:
     from _env import load_env; load_env()
@@ -26,6 +26,25 @@ except Exception:
 
 API = "https://api.zotero.org"
 HDR = {"Zotero-API-Version": "3", "Content-Type": "application/json"}
+
+
+def cat_of(r):
+    """Category as a hashable string — a weak model may emit it as a list (unhashable as a set/dict key)."""
+    c = r.get("category") or "Uncategorized"
+    if isinstance(c, list):
+        c = ", ".join(map(str, c)) or "Uncategorized"
+    return str(c)
+
+
+def keypoint_of(r):
+    """The model's one-line Chinese key point, under any plausible field name."""
+    for k, v in r.items():
+        if isinstance(v, str) and v.strip() and re.search(
+                r"(?:key[_\s-]?point|keypoint)[_\s-]?(?:zh|cn|chinese)"
+                r"|(?:zh|cn|chinese)[_\s-]?(?:key[_\s-]?point|keypoint)"
+                r"|cn[_\s-]?(?:summary|keypoint|key[_\s-]?point)|key[_\s-]?point[_\s-]?zh", k, re.I):
+            return v.strip()
+    return ""
 
 
 def have_credentials():
@@ -50,32 +69,49 @@ def _req(method, url, key, body=None):
 
 
 def creators(authors):
-    """Turn an 'A, B; C D' author string into Zotero creator dicts."""
+    """Turn authors (a list, or an 'A, B; C D' string) into Zotero creator dicts."""
     out = []
-    parts = authors.split(";") if ";" in authors else ([authors] if authors else [])
+    if isinstance(authors, list):
+        parts = [str(x) for x in authors if x]
+    else:
+        authors = authors or ""
+        parts = authors.split(";") if ";" in authors else ([authors] if authors else [])
     for a in parts:
-        a = a.strip()
+        a = (a or "").strip()
         if not a:
             continue
         if "," in a:
             last, first = a.split(",", 1)
         else:
             toks = a.split()
-            last, first = (toks[-1], " ".join(toks[:-1])) if len(toks) > 1 else (a, "")
+            if len(toks) > 1 and re.fullmatch(r"(?:[A-Z]\.?){1,3}", toks[-1]):
+                last, first = toks[0], " ".join(toks[1:])         # 'Smith J' → Smith, J (not J, Smith)
+            elif len(toks) > 1:
+                last, first = toks[-1], " ".join(toks[:-1])
+            else:
+                last, first = a, ""
         out.append({"creatorType": "author", "firstName": first.strip(), "lastName": last.strip()})
     return out
 
 
 def make_item(rec, collection_keys):
+    verified = rec.get("doi_status") == "verified"
     doi = (rec.get("verified_doi") or rec.get("doi") or "").strip()
+    extra = []
+    kp = keypoint_of(rec)
+    if kp:
+        extra.append(f"中文重点: {kp}")
+    if doi and not verified:                                       # an unconfirmed DOI never enters the trusted DOI field
+        extra.append(f"DOI待人工核对({rec.get('doi_status', '未核验')}): {doi}")
     return {
         "itemType": "journalArticle",
         "title": rec.get("title", ""),
         "creators": creators(rec.get("authors", "")),
         "date": str(rec.get("year", "")),
         "publicationTitle": rec.get("journal", ""),
-        "DOI": doi,
+        "DOI": doi if verified else "",                           # only a CONFIRMED DOI
         "abstractNote": rec.get("abstract", ""),
+        "extra": "\n".join(extra),
         "collections": collection_keys,
     }
 
@@ -114,9 +150,9 @@ def ensure_collections(base, key, categories):
 def push(records, dry_run=False):
     key = os.environ.get("ZOTERO_API_KEY", "")
     base = _base()
-    cats = sorted({(r.get("category") or "Uncategorized") for r in records})
+    cats = sorted({cat_of(r) for r in records})
     coll = {} if dry_run else ensure_collections(base, key, cats)
-    items = [make_item(r, [coll.get(r.get("category") or "Uncategorized", "")] if not dry_run else [])
+    items = [make_item(r, [coll.get(cat_of(r), "")] if not dry_run else [])
              for r in records]
     if dry_run:
         return {"dry_run": True, "items": len(items), "categories": cats, "sample": items[:2]}

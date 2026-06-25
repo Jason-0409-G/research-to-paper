@@ -1,0 +1,38 @@
+[
+  {
+    "query": "帮我定研究方向，这个大方向该缩成什么题目",
+    "should_trigger": true
+  },
+  {
+    "query": "这个综述该从哪个角度写，给我几个切入点",
+    "should_trigger": true
+  },
+  {
+    "query": "我想投 Ecological Indicators，先确定方向和投稿要求",
+    "should_trigger": true
+  },
+  {
+    "query": "help me scope this topic and pick an angle before I start",
+    "should_trigger": true
+  },
+  {
+    "query": "narrow my topic and lock the target journal and word count",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我把这些素材写成论文",
+    "should_trigger": false
+  },
+  {
+    "query": "核对这些文献的DOI真不真",
+    "should_trigger": false
+  },
+  {
+    "query": "把草稿降一下AI率",
+    "should_trigger": false
+  },
+  {
+    "query": "导出成latex",
+    "should_trigger": false
+  }
+]
