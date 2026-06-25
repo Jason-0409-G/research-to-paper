@@ -1,6 +1,6 @@
 # research-to-paper
 
-> English ｜ [中文](README.md)
+> **English** ｜ [中文](README.md)
 
 Producing a research manuscript spans a series of loosely coupled, individually error-prone stages: fixing the
 angle of attack, retrieving the literature and verifying that every citation is real and correctly attributed,
@@ -93,7 +93,7 @@ Then **restart Claude Code / Codex**.
 |---|---|
 | **research-to-paper** | Orchestrator. Detects which stage you're at and routes the request through **scope → curate → write → build** as needed; each stage is also usable on its own. |
 | **research-to-paper-scope** | **Decide the direction.** Reads authoritative literature first to understand the field, then confirms — one question at a time — the angle, scope, **target journal**, **word count**, and core themes; once the journal is set it **looks up that journal's author requirements** online (aims & scope, article types, length, structure, citation style). Produces `scope_brief.md`. |
-| **research-to-paper-curate** | **Build the library + resource search.** Five-source literature search (OpenAlex / Europe PMC / PubMed / Semantic Scholar / Crossref) → per-paper **CrossRef DOI verification** (catching dead DOIs *and* DOIs that resolve to the wrong paper, recovering the correct one) → **multi-agent adversarial review** that rejects fabricated or mis-attributed references → **direct import into Zotero by category when a Zotero API key is set**, otherwise export **RIS (Zotero/EndNote) + BibTeX + a by-category, color-coded Excel**. Also searches biology **resource** databases: any NCBI Entrez db (protein / nucleotide / gene / taxonomy / assembly / structure / SRA …) plus UniProt / RCSB PDB / AlphaFold / Europe PMC. |
+| **research-to-paper-curate** | **Build the library + resource search.** Five-source literature search (OpenAlex / Europe PMC / PubMed / Semantic Scholar / Crossref) → per-paper **CrossRef DOI verification** (catching dead DOIs *and* DOIs that resolve to the wrong paper, recovering the correct one) → **multi-agent adversarial review** that rejects fabricated or mis-attributed references → **direct import into Zotero by category when a Zotero API key is set**, otherwise export **RIS (Zotero/EndNote) + BibTeX + a rich color-coded Excel that gives every paper a one-line 中文重点 (Chinese key point)** (category / DOI-verification status / **中文重点** / innovation score / impact factor / citation count; cumulative de-duplication across searches; only a `verified` DOI is exported as a trusted DOI). DOI verification runs **in parallel** against CrossRef (8 workers, cacheable / offline). Also searches biology **resource** databases: any NCBI Entrez db (protein / nucleotide / gene / taxonomy / assembly / structure / SRA …) plus UniProt / RCSB PDB / AlphaFold / Europe PMC. |
 | **research-to-paper-write** | **Draft.** Understands the content first and restates the core argument with you, plans a **per-unit rationale matrix** (not a generic IMRaD template), and drafts with **evidence-matched hedging** (a model/gene only "predicts"; a measured whole-system result may "confirm"). Orchestrates the audit and humanize passes. Scenes: journal / conference / report / review / competition. |
 | **research-to-paper-audit** | **Multi-round adversarial review.** Spawns **three independent reviewer agents** (claim-support / logic & structure / citation integrity) plus an Editor Synthesis, and re-runs **until a round is clean**. Catches over-claims, unsupported claims, interpretation leaking into Results, shallow edits, and citations that don't support their sentence. Usable standalone ("review this draft"). |
 | **research-to-paper-humanize** | **De-AI.** Reworks prose along **five dimensions**: **D1 sentence length (long–short variation)**, D2 paragraph-structure variety, D3 information-density alternation, D4 connector control (removing AI-frequent connectors), D5 term-context variation — at a light/medium/heavy tier, recording every change in `humanize_matrix.md` and verifying with `humanize_check.py`. Usable standalone ("de-AI this paragraph"). |
@@ -170,7 +170,7 @@ manuscript_workspace/
 ├── library/
 │   ├── library.ris             # curate: Zotero / EndNote
 │   ├── library.bib             # curate: pandoc / LaTeX
-│   └── library.xlsx            # curate: by-category, color-coded (.csv fallback without openpyxl)
+│   └── library.xlsx            # curate: per-paper Chinese key point + verification-status coloring + cumulative de-dup (.csv fallback without openpyxl)
 ├── writing_rationale_matrix.md # write: per-unit rationale (claim / evidence / hedge tier / source)
 ├── draft.md                    # write: the working manuscript (with [@key] citations)
 ├── audit_report.md             # audit: three reviewers + Editor Synthesis, round by round until clean
@@ -188,7 +188,7 @@ The two artifacts that carry the most reasoning are `writing_rationale_matrix.md
 Each check is a standard-library script (repo-relative paths below; once installed they live under `~/.claude/skills/` or `~/.codex/skills/`):
 
 ```bash
-# reference DOIs are real and matched (curate)
+# reference DOIs are real and matched (curate; parallel 8 workers, --cache reuse / --no-api offline; non-zero exit on any mismatch/dead)
 python skills/research-to-paper-curate/scripts/verify_doi.py <papers.json> <verified.json>
 
 # the draft's [@key] / \cite resolve against library.bib (write -> build)
@@ -215,6 +215,39 @@ install):
 - **`pandoc`** — required by `research-to-paper-build` for LaTeX/Word output (`brew install pandoc` / `apt install pandoc` / winget on Windows).
 - **A TeX engine** (xelatex/pdflatex) — only for PDF; without it you still get the `.tex` to compile elsewhere.
 - **API credentials (all optional)** — copy `.env.example` to `.env` (or `~/.config/research-to-paper/keys.env`): `CROSSREF_MAILTO` / `NCBI_EMAIL` join the faster polite pool; `NCBI_API_KEY` / `S2_API_KEY` raise rate limits; `ZOTERO_API_KEY` + `ZOTERO_USER_ID` enable **direct categorized import into Zotero** (EndNote has no public write API, so it stays a `.ris` import). `.env` is gitignored; everything works with no key at all.
+
+---
+
+## Running on a DeepSeek backend
+
+These skills can be driven by **DeepSeek** through its Anthropic-compatible proxy (point Claude Code's
+`ANTHROPIC_BASE_URL` at `https://api.deepseek.com/anthropic`; use the model `deepseek-v4-pro[1m]` — the `[1m]` suffix
+denotes its 1M-context tier, per DeepSeek's official documentation; a template is in `templates/settings.json`). The
+design is friendly to weaker models: **all fact-checking is performed by deterministic scripts, not by the model** —
+`verify_doi.py` does parallel verification and title-matching in the script, so a weak model cannot "pretend" a DOI
+is confirmed; the model's only residual tasks are light (assigning a category, writing a one-line Chinese key point),
+and the scripts tolerate code fences / field aliases / missing fields and degrade gracefully. Note that under DeepSeek
+**sub-agents run on the weaker `deepseek-v4-flash`**, so for the curate adversarial-review gate and the audit
+reviewers, the deterministic gate in `verify_doi.py` (blocking on any `mismatch` / `dead`) should be the primary
+safeguard on a weak backend. Full checklist: **[DeepSeek compatibility note](docs/deepseek-compatibility.md)**.
+
+---
+
+## DOI-verification performance (parallel)
+
+Verifying DOIs one by one against CrossRef was the serial bottleneck in curate; parallelising it gives (measured on
+12 DOIs, single machine):
+
+| Mode | Time for 12 DOIs |
+|---|---|
+| Serial (`--workers 1`) | 45.1 s |
+| **Parallel (`--workers 8`, default)** | **7.0 s (≈6.4× faster)** |
+| Parallel + cache reuse (`--cache`) | 0.9 s (≈50×) |
+
+For a 50–100-reference library this brings verification from minutes down to seconds. The verification logic lives
+entirely in the script (parallel requests + title-matching + a discriminating-token guard; a supplied DOI is
+confirmed only at a strict 0.85 similarity), and the model takes no part in DOI resolution — so on a weaker backend
+such as DeepSeek both speed and correctness are unaffected.
 
 ---
 
