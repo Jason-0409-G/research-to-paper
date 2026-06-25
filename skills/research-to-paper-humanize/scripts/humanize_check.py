@@ -26,7 +26,7 @@ CONNECTORS = {
            "in conclusion", "to summarize", "it is worth noting", "it is important to note",
            "on the one hand", "on the other hand", "overall"],
 }
-SENT_SPLIT = {"zh": r"[。！？；\n]", "en": r"[.!?]\s"}
+SENT_SPLIT = {"zh": r"[。！？；…\n]", "en": r"[.!?]\s"}  # 含 … 省略号; 不含 ～(多为数值区间 3～5℃, 非句末)
 EN_ABBR = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof|Fig|Eq|No|al|vs|cf|etc|e\.g|i\.e)\.", re.I)
 
 
